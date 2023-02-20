@@ -1,5 +1,7 @@
 package com.utility;
 
+import com.data.ValidationRes;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -170,14 +172,22 @@ public class SystemConfiguration {
         }
     }
 
-    public static BigDecimal validateValue (BigDecimal value,  BigDecimal reference, BigDecimal minRange,
-                                            BigDecimal maxRange, BigDecimal conversionRate){
+    public static ValidationRes validateValue (BigDecimal value, BigDecimal reference, BigDecimal minRange,
+                                               BigDecimal maxRange, BigDecimal conversionRate){
+        ValidationRes response = new ValidationRes ();
         if(value != null &&(value.compareTo(BigDecimal.ZERO) ==0 ||
                 (value.compareTo(reference.multiply(maxRange))<0 && value.compareTo(reference.multiply(minRange))>0))){
-            return value;
+            if(value.compareTo(BigDecimal.ZERO) ==0 ){
+                response.setZero(true);
+            }
+            response.setValue(value);
+            response.setInvalid(false);
         }else{
-            return reference.multiply(conversionRate);
+            response.setInvalid(true);
+            response.setZero(false);
+            response.setValue(reference.multiply(conversionRate));
         }
+        return response;
     }
 
     public static boolean isNumeric(String strNum) {

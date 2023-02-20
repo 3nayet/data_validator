@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import com.data.ValidationRes;
 import com.utility.SystemConfiguration;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.ss.usermodel.Cell;
@@ -26,9 +28,12 @@ public class DataValidator {
                 "range_max" , "1.0067"));
         final BigDecimal conversionRate = new BigDecimal(sysConf.getParameter("rates",
                 "conversion_rate" , "1.0063"));
+        final BigDecimal threshold = new BigDecimal(sysConf.getParameter("rates",
+                "threshold" , "0.2"));
         SystemConfiguration.getListOfInputFiles().forEach(
                 file -> {
                     try {
+                        Long invalidCounter = 0L, zeroCounter = 0L;
                         FileInputStream fis = new FileInputStream(file);
                         Workbook workbook = WorkbookFactory.create(fis);
                         Sheet sheet = workbook.getSheetAt(0);
@@ -54,51 +59,70 @@ public class DataValidator {
                             for (int j=0; j<row.getLastCellNum(); j++)
                             {
                                 Cell cell = row.getCell(j);
-                                BigDecimal res;
+                                ValidationRes valRes = null;
                                 switch (formulaEvaluator.evaluateInCell(cell).getCellType()) {
                                     case Cell.CELL_TYPE_BLANK:
                                     case Cell.CELL_TYPE_ERROR:
                                     case Cell.CELL_TYPE_BOOLEAN:
                                     case Cell.CELL_TYPE_FORMULA:
-                                         res = SystemConfiguration.validateValue(null, lastValid.get(j),
+                                        valRes = SystemConfiguration.validateValue(null, lastValid.get(j),
                                                 rangeMin,rangeMax,conversionRate);
-                                        cell.setCellValue(res.doubleValue());
-                                        lastValid.set(j, res);
+                                        cell.setCellValue(valRes.getValue().doubleValue());
+                                        lastValid.set(j, valRes.getValue());
                                         break;
                                     case Cell.CELL_TYPE_STRING:
                                         if(SystemConfiguration.isNumeric(cell.getStringCellValue())){
-                                            res = SystemConfiguration.validateValue(
+                                            valRes = SystemConfiguration.validateValue(
                                                     new BigDecimal(cell.getStringCellValue()), lastValid.get(j),
                                                     rangeMin,rangeMax,conversionRate);
-                                            cell.setCellValue(res.doubleValue());
-                                            if(res.compareTo(BigDecimal.ZERO) !=0){
-                                                lastValid.set(j, res);
+                                            cell.setCellValue(valRes.getValue().doubleValue());
+                                            if(valRes.getValue().compareTo(BigDecimal.ZERO) !=0){
+                                                lastValid.set(j, valRes.getValue());
                                             }
                                         }else{
-                                            res = SystemConfiguration.validateValue(null, lastValid.get(j),
+                                            valRes = SystemConfiguration.validateValue(null, lastValid.get(j),
                                                     rangeMin,rangeMax,conversionRate);
-                                            cell.setCellValue(res.doubleValue());
-                                            lastValid.set(j, res);
+                                            cell.setCellValue(valRes.getValue().doubleValue());
+                                            lastValid.set(j, valRes.getValue());
                                         }
                                         break;
                                     case Cell.CELL_TYPE_NUMERIC:
-                                         res = SystemConfiguration.validateValue(
+                                         valRes = SystemConfiguration.validateValue(
                                                  BigDecimal.valueOf(cell.getNumericCellValue()), lastValid.get(j),
                                                 rangeMin,rangeMax,conversionRate);
-                                        cell.setCellValue(res.doubleValue());
-                                        if(res.compareTo(BigDecimal.ZERO) !=0){
-                                            lastValid.set(j, res);
+                                        cell.setCellValue(valRes.getValue().doubleValue());
+                                        if(valRes.getValue().compareTo(BigDecimal.ZERO) !=0){
+                                            lastValid.set(j, valRes.getValue());
                                         }
                                         break;
                                     default:
                                         break;
                                 }
+                                if(Optional.ofNullable(valRes).map(ValidationRes::isInvalid).orElse(Boolean.FALSE)){
+                                    invalidCounter++;
+                                }
+                                if(Optional.ofNullable(valRes).map(ValidationRes::isZero).orElse(Boolean.FALSE)){
+                                    zeroCounter++;
+                                }
                             }
                         }
 
                         fis.close();
+                        String fileOffset;
+                        double errRate = (double)invalidCounter / ((double)( firstRow.getLastCellNum()
+                                * (sheet.getLastRowNum()+1) - zeroCounter));
+                        if(threshold.compareTo(BigDecimal.valueOf(errRate)) > 0){
+                            fileOffset = "valid";
+                        }else{
+                            fileOffset = "invalid";
+                        }
+
+                        Row lastRow = sheet.createRow(sheet.getLastRowNum()+1);
+                        Cell resultCell = lastRow.createCell(0);
+                        resultCell.setCellValue("invalid data percentage is: " + errRate);
                         FileOutputStream outputStream = new FileOutputStream(
-                                file.getName().replaceFirst("[.][^.]+$", "") + "_output.xlsx");
+                                file.getName().replaceFirst("[.][^.]+$", "") + "_output_"
+                                        + fileOffset+ ".xlsx");
                         workbook.write(outputStream);
                         workbook.close();
                         outputStream.close();
