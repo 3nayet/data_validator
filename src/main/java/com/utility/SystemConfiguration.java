@@ -28,6 +28,7 @@ public class SystemConfiguration {
 
     private HashMap<String, HashMap<String, String>> configuration;
     private String currentContext = "";
+    public static final String OUTPUT_FILE_SUFFIX = "_output";
 
     private SystemConfiguration () {
         configuration = new HashMap<>();
@@ -164,7 +165,8 @@ public class SystemConfiguration {
         try{
             File folder = new File(getCurrentWorkingDirectory());
             File[] listOfFiles = folder.listFiles();
-            return Arrays.stream(listOfFiles).filter(f -> f.isFile() && (f.getName().endsWith(".xls")
+            return Arrays.stream(listOfFiles).filter(f -> f.isFile() && !f.getName().contains(OUTPUT_FILE_SUFFIX) &&
+                    (f.getName().endsWith(".xls")
                     ||f.getName().endsWith(".XLS")||f.getName().endsWith(".XLSX")
                     ||f.getName().endsWith(".xlsx")) ).toList();
         }catch (Exception e){

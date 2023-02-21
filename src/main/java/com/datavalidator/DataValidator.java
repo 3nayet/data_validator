@@ -112,17 +112,17 @@ public class DataValidator {
                         double errRate = (double)invalidCounter / ((double)( firstRow.getLastCellNum()
                                 * (sheet.getLastRowNum()+1) - zeroCounter));
                         if(threshold.compareTo(BigDecimal.valueOf(errRate)) > 0){
-                            fileOffset = "valid";
+                            fileOffset = "_valid";
                         }else{
-                            fileOffset = "invalid";
+                            fileOffset = "_invalid";
                         }
 
                         Row lastRow = sheet.createRow(sheet.getLastRowNum()+1);
                         Cell resultCell = lastRow.createCell(0);
                         resultCell.setCellValue("invalid data percentage is: " + errRate);
                         FileOutputStream outputStream = new FileOutputStream(
-                                file.getName().replaceFirst("[.][^.]+$", "") + "_output_"
-                                        + fileOffset+ ".xlsx");
+                                file.getName().replaceFirst("[.][^.]+$", "")+
+                                        SystemConfiguration.OUTPUT_FILE_SUFFIX + fileOffset+ ".xlsx");
                         workbook.write(outputStream);
                         workbook.close();
                         outputStream.close();
